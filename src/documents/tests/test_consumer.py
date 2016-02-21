@@ -1,3 +1,4 @@
+import datetime
 from django.test import TestCase
 
 from ..consumer import Consumer
@@ -12,6 +13,10 @@ class TestAttachment(TestCase):
         for suffix in ("pdf", "png", "jpg", "jpeg", "gif"):
             f = path.format(suffix)
             results = self.CONSUMER._guess_attributes_from_name(f)
+            # skip timestamp in first position, not included in these tests
+            self.assertIsNone(results[0])
+            results = results[1:]
+
             self.assertEqual(results[0].name, sender, f)
             self.assertEqual(results[1], title, f)
             self.assertEqual(tuple([t.slug for t in results[2]]), tags, f)
@@ -128,7 +133,17 @@ class Permutations(TestCase):
 
     def _test_guessed_attributes(
             self, filename, title, suffix, sender=None, tags=None):
-        got_sender, got_title, got_tags, got_suffix = \
+        self._test_guessed_attributes_with_timestamp(
+            filename, title, suffix, sender=sender, tags=tags, timestamp=None)
+        self._test_guessed_attributes_with_timestamp(
+            '20150707T204612 - {}'.format(filename), title, suffix,
+            sender=sender, tags=tags,
+            timestamp=datetime.datetime(2015, 7, 7, 20, 46, 12))
+
+    def _test_guessed_attributes_with_timestamp(
+            self, filename, title, suffix,
+            sender=None, tags=None, timestamp=None):
+        got_timestamp, got_sender, got_title, got_tags, got_suffix = \
             self.CONSUMER._guess_attributes_from_name(filename)
 
         # Required
@@ -144,6 +159,7 @@ class Permutations(TestCase):
         else:
             self.assertEqual([t.slug for t in got_tags], tags.split(','),
                              filename)
+        self.assertEqual(got_timestamp, timestamp, filename)
 
     def test_just_title(self):
         template = '/path/to/{title}.{suffix}'
