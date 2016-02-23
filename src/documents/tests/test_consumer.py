@@ -124,7 +124,7 @@ class TestAttachment(TestCase):
         )
 
 
-class Permutations(TestCase):
+class FilenamePermutations(TestCase):
     CONSUMER = Consumer()
 
     valid_senders = ['timmy', 'Dr. McWheelie', 'Dash Gor-don', 'ο Θερμαστής']
@@ -191,3 +191,6 @@ class Permutations(TestCase):
                                     tags=tags, suffix=suffix)
                         filename = template.format(**spec)
                         self._test_guessed_attributes(filename, **spec)
+
+
+class Consume(TestCase):

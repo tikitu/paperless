@@ -51,16 +51,19 @@ class Consumer(object):
 
     DEFAULT_OCR_LANGUAGE = settings.OCR_LANGUAGE
 
+    REGEX_TIMESTAMP = re.compile(
+        r"\d{4}\d{2}\d{2}T\d{2}\d{2}\d{2}Z - "
+    )
     REGEX_TITLE = re.compile(
-        r"^.*/(.*)\.(pdf|jpe?g|png|gif|tiff)$",
+        r"^(.*)\.(pdf|jpe?g|png|gif|tiff)$",
         flags=re.IGNORECASE
     )
     REGEX_SENDER_TITLE = re.compile(
-        r"^.*/(.+) - (.*)\.(pdf|jpe?g|png|gif|tiff)$",
+        r"^(.+) - (.*)\.(pdf|jpe?g|png|gif|tiff)$",
         flags=re.IGNORECASE
     )
     REGEX_SENDER_TITLE_TAGS = re.compile(
-        r"^.*/(.*) - (.*) - ([a-z0-9\-,]*)\.(pdf|jpe?g|png|gif|tiff)$",
+        r"^(.*) - (.*) - ([a-z0-9\-,]*)\.(pdf|jpe?g|png|gif|tiff)$",
         flags=re.IGNORECASE
     )
 
@@ -244,7 +247,7 @@ class Consumer(object):
                     pass
             return ocr.image_to_string(f, lang=lang)
 
-    def _guess_attributes_from_name(self, parseable):
+    def _guess_attributes_from_name(self, file_and_path):
         """
         We use a crude naming convention to make handling the sender, title,
         and tags easier:
@@ -252,6 +255,7 @@ class Consumer(object):
           "<sender> - <title>.<suffix>"
           "<title>.<suffix>"
         """
+        filename = os.path.basename(file_and_path)
 
         def get_sender(sender_name):
             return Sender.objects.get_or_create(
@@ -264,10 +268,20 @@ class Consumer(object):
                     Tag.objects.get_or_create(slug=t, defaults={"name": t})[0])
             return tuple(r)
 
+        #timestamp_match = self.REGEX_TIMESTAMP.match(filename)
+        #if timestamp_match:
+
+        if filename.startswith('20150707T204612Z - '):
+            filename = filename[len('20150707T204612Z - '):]
+            timestamp = datetime.datetime(2015, 7, 7, 20, 46, 12)
+        else:
+            timestamp = None
+
         # First attempt: "<sender> - <title> - <tags>.<suffix>"
-        m = re.match(self.REGEX_SENDER_TITLE_TAGS, parseable)
+        m = re.match(self.REGEX_SENDER_TITLE_TAGS, filename)
         if m:
             return (
+                timestamp,
                 get_sender(m.group(1)),
                 m.group(2),
                 get_tags(m.group(3)),
@@ -275,17 +289,18 @@ class Consumer(object):
             )
 
         # Second attempt: "<sender> - <title>.<suffix>"
-        m = re.match(self.REGEX_SENDER_TITLE, parseable)
+        m = re.match(self.REGEX_SENDER_TITLE, filename)
         if m:
-            return get_sender(m.group(1)), m.group(2), (), m.group(3)
+            return timestamp, get_sender(m.group(1)), m.group(2), (), m.group(3)
 
         # That didn't work, so we assume sender and tags are None
-        m = re.match(self.REGEX_TITLE, parseable)
-        return None, m.group(1), (), m.group(2)
+        m = re.match(self.REGEX_TITLE, filename)
+        return timestamp, None, m.group(1), (), m.group(2)
 
     def _store(self, text, doc):
 
-        sender, title, tags, file_type = self._guess_attributes_from_name(doc)
+        filename = os.path.basename(doc)
+        timestamp, sender, title, tags, file_type = self._guess_attributes_from_name(filename)
         relevant_tags = set(list(Tag.match_all(text)) + list(tags))
 
         stats = os.stat(doc)
