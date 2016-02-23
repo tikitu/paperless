@@ -1,4 +1,5 @@
 import datetime
+import os
 from django.test import TestCase
 
 from ..consumer import Consumer
@@ -135,8 +136,10 @@ class Permutations(TestCase):
             self, filename, title, suffix, sender=None, tags=None):
         self._test_guessed_attributes_with_timestamp(
             filename, title, suffix, sender=sender, tags=tags, timestamp=None)
+        path, basename = os.path.split(filename)
+        filename = os.path.join(path, '20150707T204612Z - {}'.format(basename))
         self._test_guessed_attributes_with_timestamp(
-            '20150707T204612 - {}'.format(filename), title, suffix,
+            filename, title, suffix,
             sender=sender, tags=tags,
             timestamp=datetime.datetime(2015, 7, 7, 20, 46, 12))
 
